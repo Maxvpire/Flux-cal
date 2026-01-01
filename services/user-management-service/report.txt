@@ -1,0 +1,4 @@
+-------------------------------------------------------------------------------
+Test set: com.flux.user_management_service.user.UserControllerTest
+-------------------------------------------------------------------------------
+Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 5.628 s -- in com.flux.user_management_service.user.UserControllerTest

@@ -1,0 +1,7 @@
+CREATE TABLE tasks (
+    id VARCHAR(255) PRIMARY KEY,
+    task VARCHAR(255) NOT NULL,
+    is_done BOOLEAN DEFAULT FALSE,
+    event_id VARCHAR(255) NOT NULL,
+    FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE CASCADE
+);
