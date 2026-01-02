@@ -1,5 +1,15 @@
 spring:
   config:
     import: optional:configserver:http://localhost:8888
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          # Same realm as Gateway – this is important
+          issuer-uri: http://localhost:8080/realms/flux
+  cloud:
+    config:
+      username: maxvpire
+      password: h(wuP}}&R8Jk1RT/0$5KBT$yw00
   application:
     name: user-management-service

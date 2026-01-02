@@ -1,17 +1,17 @@
 version: '3.7'
 
 services:
-  flux:
-    image: postgres:16
-    container_name: flux
-    environment:
-      POSTGRES_PASSWORD: m12345
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    ports:
-      - "5432:5432"
-    networks:
-      - flux-network
+#  flux:
+#    image: postgres:16
+#    container_name: flux
+#    environment:
+#      POSTGRES_PASSWORD: m12345
+#    volumes:
+#      - postgres_data:/var/lib/postgresql/data
+#    ports:
+#      - "5432:5432"
+#    networks:
+#      - flux-network
 
   my-redis:
     image: redis:latest
@@ -20,6 +20,19 @@ services:
       - "6379:6379"
     networks:
       - flux-network
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.0.0
+    container_name: keycloak
+    environment:
+      # Initial admin user
+      - KEYCLOAK_ADMIN=admin
+      - KEYCLOAK_ADMIN_PASSWORD=admin
+    ports:
+      - "8080:8080"
+    command: start-dev
+    # If you want it to restart automatically when your machine reboots:
+    restart: unless-stopped
 
 #  discovery-service:
 #    build:
