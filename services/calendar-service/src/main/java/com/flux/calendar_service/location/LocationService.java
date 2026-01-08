@@ -2,7 +2,7 @@ package com.flux.calendar_service.location;
 
 import com.flux.calendar_service.event.Event;
 import com.flux.calendar_service.event.EventRepository;
-import com.flux.calendar_service.event.EventService;
+import com.flux.calendar_service.exceptions.GoogleCalendarSyncFailedException;
 import com.flux.calendar_service.google.GoogleCalendarApiService;
 import com.flux.calendar_service.location.dto.LocationRequest;
 import com.flux.calendar_service.location.dto.LocationResponse;
@@ -134,8 +134,7 @@ public class LocationService {
                 log.info("Event location updated and synced to Google Calendar. Event ID: {}, Google Calendar ID: {}",
                         event.getId(), event.getGoogleCalendarId());
             } catch (IOException e) {
-                log.error("Failed to sync event location update to Google Calendar. Event ID: {}", event.getId(), e);
-                // We don't throw here to avoid rolling back the local transaction if sync fails
+                throw new GoogleCalendarSyncFailedException("Failed to sync event location update to Google Calendar. Event ID: {}" + event.getId() + e.getMessage());
             }
         }
     }

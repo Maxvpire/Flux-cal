@@ -10,6 +10,11 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
+import com.flux.calendar_service.exceptions.MinIoBucketInitializingErrorException;
+import com.flux.calendar_service.exceptions.MinIoDeleteErrorException;
+import com.flux.calendar_service.exceptions.MinIoRetrievingErrorException;
+import com.flux.calendar_service.exceptions.MinIoUploadingErrorException;
+
 import jakarta.annotation.PostConstruct;
 import java.io.InputStream;
 
@@ -32,7 +37,7 @@ public class MinioService {
                 log.info("Created MinIO bucket: {}", bucketName);
             }
         } catch (Exception e) {
-            log.error("Error initializing MinIO bucket", e);
+            throw new MinIoBucketInitializingErrorException("Error initializing MinIO bucket" + e.getMessage());
         }
     }
 
@@ -49,7 +54,7 @@ public class MinioService {
             return fileName;
         } catch (Exception e) {
             log.error("Error uploading file to MinIO", e);
-            throw new RuntimeException("Failed to upload file", e);
+            throw new MinIoUploadingErrorException("Failed to upload file: " + e.getMessage());
         }
     }
 
@@ -66,7 +71,7 @@ public class MinioService {
                             .build());
         } catch (Exception e) {
             log.error("Error retrieving file from MinIO: {}", fileName, e);
-            throw new RuntimeException("Failed to retrieve file", e);
+            throw new MinIoRetrievingErrorException("Failed to retrieve file" + e.getMessage());
         }
     }
 
@@ -79,7 +84,7 @@ public class MinioService {
                             .build());
         } catch (Exception e) {
             log.error("Error deleting file from MinIO: {}", fileName, e);
-            throw new RuntimeException("Failed to delete file", e);
+            throw new MinIoDeleteErrorException("Failed to delete file" + e.getMessage()    );
         }
     }
 }

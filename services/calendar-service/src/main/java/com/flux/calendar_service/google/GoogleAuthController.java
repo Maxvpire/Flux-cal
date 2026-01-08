@@ -10,6 +10,10 @@ import com.google.api.client.auth.oauth2.Credential;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.view.RedirectView;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
 
 import java.io.IOException;
 import java.util.Map;
@@ -17,6 +21,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/auth")
 @ConditionalOnProperty(name = "google.calendar.enabled", havingValue = "true", matchIfMissing = false)
+@Tag(name = "Google Auth Controller", description = "Endpoints for Google OAuth2 authentication")
 public class GoogleAuthController {
 
     @Autowired
@@ -28,6 +33,8 @@ public class GoogleAuthController {
      *
      * This redirects user to Google's consent page
      */
+    @Operation(summary = "Authenticate with Google", description = "Initiates OAuth flow by redirecting to Google consent page")
+    @ApiResponse(responseCode = "302", description = "Redirects to Google")
     @GetMapping("/google")
     public RedirectView authenticateWithGoogle(
             @RequestParam("userId") String userId,
@@ -57,6 +64,11 @@ public class GoogleAuthController {
      *
      * Google redirects here after user grants permission
      */
+    @Operation(summary = "Google OAuth Callback", description = "Handles callback from Google after user grants permission")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Successfully authenticated"),
+            @ApiResponse(responseCode = "400", description = "Authentication failed")
+    })
     @GetMapping("/google/callback")
     public Map<String, Object> handleGoogleCallback(
             @RequestParam("code") String authorizationCode,
@@ -106,6 +118,8 @@ public class GoogleAuthController {
      * Check authentication status
      * GET http://localhost:8080/auth/status
      */
+    @Operation(summary = "Check Auth Status", description = "Checks if the current session is authenticated with Google")
+    @ApiResponse(responseCode = "200", description = "Returns authentication status")
     @GetMapping("/status")
     public Map<String, Object> checkAuthStatus(HttpSession session) {
         Boolean isAuthenticated = (Boolean) session.getAttribute("user_authenticated");
@@ -126,6 +140,8 @@ public class GoogleAuthController {
      * Logout and revoke access
      * POST http://localhost:8080/auth/logout
      */
+    @Operation(summary = "Logout", description = "Logs out and optionally revokes access token")
+    @ApiResponse(responseCode = "200", description = "Logged out successfully")
     @PostMapping("/logout")
     public Map<String, String> logout(HttpSession session) {
         try {
@@ -152,6 +168,11 @@ public class GoogleAuthController {
      * Refresh access token
      * POST http://localhost:8080/auth/refresh
      */
+    @Operation(summary = "Refresh Token", description = "Refreshes the access token if needed")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Token refreshed"),
+            @ApiResponse(responseCode = "401", description = "Not authenticated or refresh failed")
+    })
     @PostMapping("/refresh")
     public Map<String, Object> refreshToken(HttpSession session) {
         try {

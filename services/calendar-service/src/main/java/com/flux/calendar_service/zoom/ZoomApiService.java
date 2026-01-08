@@ -1,5 +1,7 @@
 package com.flux.calendar_service.zoom;
 
+import com.flux.calendar_service.exceptions.ZoomCredentionalsNotFullyConfiguredException;
+import com.flux.calendar_service.exceptions.ZoomMeetingFailedException;
 import com.flux.calendar_service.zoom.dto.ZoomMeetingRequest;
 import com.flux.calendar_service.zoom.dto.ZoomMeetingResponse;
 import lombok.RequiredArgsConstructor;
@@ -51,7 +53,7 @@ public class ZoomApiService {
             return response.getBody();
         } catch (Exception e) {
             log.error("Failed to create Zoom meeting", e);
-            throw new RuntimeException("Failed to create Zoom meeting", e);
+            throw new ZoomMeetingFailedException("Failed to create Zoom meeting" + e.getMessage());
         }
     }
 
@@ -71,6 +73,7 @@ public class ZoomApiService {
                     Void.class);
         } catch (Exception e) {
             log.error("Failed to delete Zoom meeting: {}", meetingId, e);
+            throw new ZoomMeetingFailedException("Failed to delete Zoom meeting: " + meetingId + e.getMessage());
         }
     }
 
@@ -85,7 +88,8 @@ public class ZoomApiService {
             log.error(
                     "Zoom environment variables are not expanded! Check your configuration. ClientID: {}, ClientSecret: {}, AccountID: {}",
                     trimmedClientId, trimmedClientSecret, trimmedAccountId);
-            throw new RuntimeException("Zoom environment variables are not expanded");
+                    // Zoom environment variables are not expanded
+            throw new ZoomMeetingFailedException("Something went wrong! try again!");
         }
 
         log.debug("Fetching Zoom access token. Client ID: {}, Account ID: {}",
@@ -96,7 +100,7 @@ public class ZoomApiService {
                     trimmedClientId != null ? "SET" : "MISSING",
                     trimmedClientSecret != null ? "SET" : "MISSING",
                     trimmedAccountId != null ? "SET" : "MISSING");
-            throw new RuntimeException("Zoom credentials are not fully configured");
+            throw new ZoomCredentionalsNotFullyConfiguredException("Zoom credentials are not fully configured");
         }
 
         HttpHeaders headers = new HttpHeaders();
@@ -121,11 +125,11 @@ public class ZoomApiService {
             } else {
                 log.error("Zoom auth response did not contain access_token. Status: {}, Body: {}",
                         response.getStatusCode(), response.getBody());
-                throw new RuntimeException("Failed to get Zoom access token: No token in response");
+                throw new ZoomMeetingFailedException("Failed to get Zoom access token: No token in response");
             }
         } catch (Exception e) {
             log.error("Failed to get Zoom access token. URL: {}", url, e);
-            throw new RuntimeException("Failed to get Zoom access token", e);
+            throw new ZoomMeetingFailedException("Failed to get Zoom access token" + e.getMessage());
         }
     }
 

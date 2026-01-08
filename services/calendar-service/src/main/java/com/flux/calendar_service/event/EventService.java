@@ -8,6 +8,13 @@ import com.flux.calendar_service.conference.ConferenceRepository;
 import com.flux.calendar_service.event.dto.EventRequest;
 import com.flux.calendar_service.event.dto.EventResponse;
 import com.flux.calendar_service.event.dto.EventUpdateRequest;
+import com.flux.calendar_service.exceptions.AddGoogleMeetFailedException;
+import com.flux.calendar_service.exceptions.ConflictException;
+import com.flux.calendar_service.exceptions.GoogleCalendarDisabledException;
+import com.flux.calendar_service.exceptions.GoogleCalendarSyncFailedException;
+import com.flux.calendar_service.exceptions.IncorrectTimeException;
+import com.flux.calendar_service.exceptions.MustNotBeEmptyException;
+import com.flux.calendar_service.exceptions.RemoveGoogleMeetFailedException;
 import com.flux.calendar_service.google.GoogleCalendarApiService;
 import com.flux.calendar_service.location.Location;
 import com.flux.calendar_service.location.LocationMapper;
@@ -46,7 +53,7 @@ public class EventService {
     @Transactional
     public String createEvent(String calendarId, EventRequest request) {
         if (calendarId == null || calendarId.isBlank()) {
-            throw new RuntimeException("Calendar ID cannot be empty");
+            throw new MustNotBeEmptyException("Calendar ID cannot be empty");
         }
 
         // Validate calendar exists
@@ -56,7 +63,7 @@ public class EventService {
         // Validate time if not all-day event
         if (!request.allDay() && request.startTime() != null && request.endTime() != null) {
             if (request.endTime().isBefore(request.startTime())) {
-                throw new RuntimeException("End time cannot be before start time");
+                throw new IncorrectTimeException("End time cannot be before start time");
             }
         }
 
@@ -104,12 +111,12 @@ public class EventService {
                 log.info("Event created and synced to Google Calendar. Event ID: {}, Google Calendar ID: {}",
                         savedEvent.getId(), googleEvent.getId());
             } catch (IOException e) {
-                log.error("Failed to sync event to Google Calendar. Event ID: {}", savedEvent.getId(), e);
                 savedEvent.setSyncStatus(SyncStatus.PENDING);
                 eventRepository.save(savedEvent);
+                throw new GoogleCalendarSyncFailedException("Failed to sync event to Google Calendar. Event ID: {}" + savedEvent.getId() + e.getMessage());
             }
         } else {
-            log.debug("Google Calendar integration is disabled. Event created locally only.");
+            throw new GoogleCalendarDisabledException("Google Calendar integration is disabled. Event created locally only.");
         }
 
         return savedEvent.getId();
@@ -119,22 +126,19 @@ public class EventService {
     public String createEventWithGoogleMeet(String calendarId, EventRequest request) {
 
         if (calendarId == null || calendarId.isBlank()) {
-            throw new RuntimeException("Calendar ID cannot be empty");
+            throw new MustNotBeEmptyException("Calendar ID cannot be empty");
         }
 
-        // 1️⃣ Validate calendar
         Calendar calendar = calendarRepository.findById(calendarId)
                 .orElseThrow(() -> new NotFoundException("Calendar not found with ID: " + calendarId));
 
-        // 2️⃣ Validate time
         if (!request.allDay()
                 && request.startTime() != null
                 && request.endTime() != null
                 && request.endTime().isBefore(request.startTime())) {
-            throw new RuntimeException("End time cannot be before start time");
+            throw new IncorrectTimeException("End time cannot be before start time");
         }
 
-        // 3️⃣ Create & save local event
         Event event = eventMapper.toEvent(request, calendar);
         if (event.getTasks() != null) {
             event.getTasks().forEach(task -> task.setEvent(event));
@@ -146,8 +150,7 @@ public class EventService {
 
         // 4️⃣ Google sync (optional)
         if (googleCalendarApiService == null) {
-            log.debug("Google Calendar integration disabled. Event created locally only.");
-            return savedEvent.getId();
+            throw new GoogleCalendarDisabledException("Google Calendar integration disabled. Event created locally only.");
         }
 
         try {
@@ -225,11 +228,9 @@ public class EventService {
                     meetLink);
 
         } catch (IOException e) {
-            log.error("Failed to sync event to Google Calendar. Event ID: {}",
-                    savedEvent.getId(), e);
-
             savedEvent.setSyncStatus(SyncStatus.PENDING);
             eventRepository.save(savedEvent);
+            throw new GoogleCalendarSyncFailedException("Failed to sync event to Google Calendar. Event ID: " + savedEvent.getId() + e.getMessage());
         }
 
         return savedEvent.getId();
@@ -238,14 +239,14 @@ public class EventService {
     @Transactional
     public void addGoogleMeetToExistingEvent(String id) {
         if (id == null || id.isBlank()) {
-            throw new RuntimeException("Event ID cannot be empty");
+            throw new MustNotBeEmptyException("Event ID cannot be empty");
         }
 
         Event event = eventRepository.findById(id)
                 .orElseThrow(() -> new NotFoundException("Event not found with ID: " + id));
 
         if (googleCalendarApiService == null) {
-            throw new RuntimeException("Google Calendar integration is disabled");
+            throw new GoogleCalendarDisabledException("Google Calendar integration is disabled");
         }
 
         try {
@@ -303,14 +304,14 @@ public class EventService {
 
         } catch (IOException e) {
             log.error("Failed to add Google Meet to event. Event ID: {}", event.getId(), e);
-            throw new RuntimeException("Failed to add Google Meet", e);
+            throw new AddGoogleMeetFailedException("Failed to add Google Meet" + e.getMessage());
         }
     }
 
     @Transactional
     public void removeGoogleMeetFromEvent(String id) {
         if (id == null || id.isBlank()) {
-            throw new RuntimeException("Event ID cannot be empty");
+            throw new MustNotBeEmptyException("Event ID cannot be empty");
         }
 
         Event event = eventRepository.findById(id)
@@ -322,10 +323,6 @@ public class EventService {
 
         if (googleCalendarApiService != null && event.getGoogleCalendarId() != null) {
             try {
-                // We don't have a direct 'removeMeet' in ApiService, but we can update the
-                // event with null conferenceData
-                // For now, let's assume we want to clear it locally and potentially update
-                // Google
                 String userId = event.getCalendar().getUserId();
                 com.google.api.services.calendar.model.Event googleEvent = googleCalendarApiService.getEventById(userId,
                         getGoogleEventId(event));
@@ -336,7 +333,7 @@ public class EventService {
                         userId,
                         getGoogleEventId(event));
             } catch (IOException e) {
-                log.error("Failed to remove Google Meet from Google Calendar. Event ID: {}", event.getId(), e);
+                throw new RemoveGoogleMeetFailedException("Failed to remove Google Meet from Google Calendar. Event ID: {}" + event.getId() + e.getMessage());
             }
         }
 
@@ -351,7 +348,7 @@ public class EventService {
     @Transactional
     public String createEventWithNewZoomMeeting(String calendarId, EventRequest request) {
         if (calendarId == null || calendarId.isBlank()) {
-            throw new RuntimeException("Calendar ID cannot be empty");
+            throw new MustNotBeEmptyException("Calendar ID cannot be empty");
         }
 
         Calendar calendar = calendarRepository.findById(calendarId)
@@ -406,9 +403,9 @@ public class EventService {
                 log.info("Event created with Zoom and synced to Google Calendar. Event ID: {}, Zoom ID: {}",
                         savedEvent.getId(), zoomResponse.getId());
             } catch (IOException e) {
-                log.error("Failed to sync Zoom event to Google Calendar", e);
                 savedEvent.setSyncStatus(SyncStatus.PENDING);
                 eventRepository.save(savedEvent);
+                throw new GoogleCalendarSyncFailedException("Failed to sync Zoom event to Google Calendar" + e.getMessage());
             }
         }
 
@@ -441,7 +438,7 @@ public class EventService {
                         zoomResponse.getId(),
                         zoomResponse.getPassword());
             } catch (IOException e) {
-                log.error("Failed to add Zoom to Google Calendar event", e);
+                throw new GoogleCalendarSyncFailedException("Failed to add Zoom to Google Calendar event" + e.getMessage());
             }
         }
 
@@ -485,7 +482,7 @@ public class EventService {
                         event.getCalendar().getUserId(),
                         event.getGoogleCalendarId());
             } catch (IOException e) {
-                log.error("Failed to remove Zoom from Google Calendar event", e);
+                throw new GoogleCalendarSyncFailedException("Failed to remove Zoom from Google Calendar event" + e.getMessage());
             }
         }
 
@@ -511,7 +508,7 @@ public class EventService {
 
     public EventResponse getEventById(String id) {
         if (id == null || id.isBlank()) {
-            throw new RuntimeException("Event ID cannot be empty");
+            throw new MustNotBeEmptyException("Event ID cannot be empty");
         }
 
         return eventRepository.findById(id)
@@ -521,7 +518,7 @@ public class EventService {
 
     public List<EventResponse> getEventsByCalendarId(String calendarId) {
         if (calendarId == null || calendarId.isBlank()) {
-            throw new RuntimeException("Calendar ID cannot be empty");
+            throw new MustNotBeEmptyException("Calendar ID cannot be empty");
         }
 
         // Validate calendar exists
@@ -536,7 +533,7 @@ public class EventService {
 
     public List<EventResponse> getEventsByUserId(String userId) {
         if (userId == null || userId.isBlank()) {
-            throw new RuntimeException("User ID cannot be empty");
+            throw new MustNotBeEmptyException("User ID cannot be empty");
         }
 
         List<EventResponse> userEvents = eventRepository.findByCalendar_UserId(userId)
@@ -554,7 +551,7 @@ public class EventService {
     @Transactional
     public void updateEvent(String id, EventUpdateRequest request) {
         if (id == null || id.isBlank()) {
-            throw new RuntimeException("Event ID cannot be empty");
+            throw new MustNotBeEmptyException("Event ID cannot be empty");
         }
 
         Event event = eventRepository.findById(id)
@@ -567,7 +564,7 @@ public class EventService {
 
         if (!isAllDay && newStartTime != null && newEndTime != null) {
             if (newEndTime.isBefore(newStartTime)) {
-                throw new RuntimeException("End time cannot be before start time");
+                throw new IncorrectTimeException("End time cannot be before start time");
             }
         }
 
@@ -630,9 +627,9 @@ public class EventService {
                 log.info("Event updated and synced to Google Calendar. Event ID: {}, Google Calendar ID: {}",
                         event.getId(), event.getGoogleCalendarId());
             } catch (IOException e) {
-                log.error("Failed to sync event update to Google Calendar. Event ID: {}", event.getId(), e);
                 event.setSyncStatus(SyncStatus.PENDING);
                 eventRepository.save(event);
+                throw new GoogleCalendarSyncFailedException("Failed to sync event update to Google Calendar. Event ID: {}" + event.getId() + e.getMessage());
             }
         }
     }
@@ -640,7 +637,7 @@ public class EventService {
     @Transactional
     public void deleteEvent(String id) {
         if (id == null || id.isBlank()) {
-            throw new RuntimeException("Event ID cannot be empty");
+            throw new MustNotBeEmptyException("Event ID cannot be empty");
         }
 
         Event event = eventRepository.findById(id)
@@ -654,8 +651,7 @@ public class EventService {
                 log.info("Event deleted from Google Calendar. Event ID: {}, Google Calendar ID: {}",
                         event.getId(), event.getGoogleCalendarId());
             } catch (IOException e) {
-                log.error("Failed to delete event from Google Calendar. Event ID: {}", event.getId(), e);
-                // Continue with local deletion even if Google Calendar deletion fails
+                throw new GoogleCalendarSyncFailedException("Failed to delete event from Google Calendar. Event ID: {}" + event.getId() + e.getMessage());
             }
         }
 
@@ -689,7 +685,7 @@ public class EventService {
                 .orElseThrow(() -> new NotFoundException("Conference not found with ID: " + conferenceId));
 
         if (conference.getEvent() != null && !conference.getEvent().getId().equals(eventId)) {
-            throw new RuntimeException("Conference is already attached to another event");
+            throw new ConflictException("Conference is already attached to another event");
         }
 
         conference.setEvent(event);

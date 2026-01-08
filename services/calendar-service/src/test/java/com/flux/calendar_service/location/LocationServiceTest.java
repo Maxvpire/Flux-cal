@@ -5,6 +5,7 @@ import com.flux.calendar_service.event.Event;
 import com.flux.calendar_service.event.EventRepository;
 import com.flux.calendar_service.google.GoogleCalendarApiService;
 import com.flux.calendar_service.location.dto.LocationRequest;
+import com.flux.calendar_service.location.dto.UpdateLocation;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -110,5 +111,41 @@ class LocationServiceTest {
 
         // Assert
         verify(googleCalendarApiService, never()).updateEventLocation(any(), any(), any());
+    }
+
+    @Test
+    void deleteLocation_Success() throws IOException {
+        // Arrange
+        Location location = Location.builder().id("loc-123").build();
+        when(locationRepository.findById("loc-123")).thenReturn(Optional.of(location));
+        when(eventRepository.findEventByLocationId("loc-123")).thenReturn(Optional.of(event));
+
+        // Act
+        locationService.deleteLocation("loc-123");
+
+        // Assert
+        verify(locationRepository).delete(location);
+        verify(eventRepository).save(event);
+        verify(googleCalendarApiService).updateEventLocation(any(), any(), eq(null));
+    }
+
+    @Test
+    void updateLocation_Success() throws IOException {
+        // Arrange
+        UpdateLocation updateRequest = new UpdateLocation(
+                "New Place", "Street", "City", "Country", "Building", 5, "Room", 0.0, 0.0, "pid"
+        );
+        Location location = Location.builder().id("loc-123").build();
+        when(locationRepository.findById("loc-123")).thenReturn(Optional.of(location));
+        when(locationRepository.save(location)).thenReturn(location);
+        when(eventRepository.findEventByLocationId("loc-123")).thenReturn(Optional.of(event));
+
+        // Act
+        locationService.updateLocation("loc-123", updateRequest);
+
+        // Assert
+        assertEquals("New Place", location.getPlaceName());
+        verify(locationRepository).save(location);
+        verify(googleCalendarApiService).updateEventLocation(eq("user-123"), eq("google-event-123"), contains("New Place"));
     }
 }

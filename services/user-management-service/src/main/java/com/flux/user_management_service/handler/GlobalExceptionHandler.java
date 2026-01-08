@@ -5,7 +5,6 @@ import java.util.Map;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -13,7 +12,10 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import com.flux.user_management_service.exception.UserAlreadyExistsException;
 import com.flux.user_management_service.exception.UserNotFoundException;
 
+import lombok.extern.slf4j.Slf4j;
+
 @RestControllerAdvice
+@Slf4j
 public class GlobalExceptionHandler {
 
     @ExceptionHandler(UserNotFoundException.class)
@@ -35,23 +37,28 @@ public class GlobalExceptionHandler {
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
-    public ResponseEntity<ErrorResponse> handleMethodArgumentNotValidException(MethodArgumentNotValidException exp) {
+    public ResponseEntity<ErrorResponse> handleMethodArgumentNotValidException(MethodArgumentNotValidException ex) {
+
         Map<String, String> errors = new HashMap<>();
-        exp.getBindingResult().getAllErrors().forEach(error -> {
-            var fieldName = ((FieldError) error).getField();
-            var errorMessage = error.getDefaultMessage();
-            errors.put(fieldName, errorMessage);
-        });
+
+        ex.getBindingResult()
+            .getFieldErrors()
+            .forEach(error -> 
+                errors.put(error.getField(), error.getDefaultMessage())
+            );
 
         return ResponseEntity
-                .status(HttpStatus.BAD_REQUEST)
-                .body(new ErrorResponse(errors));
-    }
+            .status(HttpStatus.BAD_REQUEST)
+            .body(new ErrorResponse(errors));
+}
 
     @ExceptionHandler(Exception.class)
-    public ResponseEntity<ErrorResponse> handleException(Exception exp) {
+    public ResponseEntity<ErrorResponse> handleAllExceptions(Exception ex) {
+
         Map<String, String> errors = new HashMap<>();
-        errors.put("error", exp.getMessage());
+        errors.put("error", ex.getMessage());
+        log.error("Unhandled exception occurred", ex);
+
         return ResponseEntity
                 .status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body(new ErrorResponse(errors));

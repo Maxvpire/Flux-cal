@@ -10,22 +10,41 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.Content;
 
 @RestController
 @RequestMapping("/attachments")
 @RequiredArgsConstructor
+@Tag(name = "Attachment Controller", description = "Endpoints for managing attachments")
 public class AttachmentController {
     private final AttachmentService attachmentService;
 
-    @PostMapping("/event/{eventId}")
+    @Operation(summary = "Upload attachment", description = "Uploads an attachment for a specific event")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "201", description = "Attachment uploaded successfully"),
+            @ApiResponse(responseCode = "400", description = "Invalid input"),
+            @ApiResponse(responseCode = "404", description = "Event not found")
+    })
+    @PostMapping(value = "/event/{eventId}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<AttachmentResponse> uploadAttachment(
             @PathVariable String eventId,
-            @RequestParam("file") MultipartFile file) {
+            @Parameter(description = "File to upload", content = @Content(mediaType = MediaType.MULTIPART_FORM_DATA_VALUE))
+            @RequestPart("file") MultipartFile file) {
         return ResponseEntity
                 .status(HttpStatus.CREATED)
                 .body(attachmentService.uploadAttachment(eventId, file));
     }
 
+    @Operation(summary = "Download attachment file", description = "Downloads the file associated with an attachment ID")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "File downloaded successfully"),
+            @ApiResponse(responseCode = "404", description = "Attachment not found")
+    })
     @GetMapping("/{attachmentId}/file")
     public ResponseEntity<Resource> getFile(@PathVariable String attachmentId) {
         Attachment attachment = attachmentService.getAttachment(attachmentId);
@@ -39,6 +58,11 @@ public class AttachmentController {
                 .body(resource);
     }
 
+    @Operation(summary = "Delete attachment", description = "Deletes an attachment by its ID")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "204", description = "Attachment deleted successfully"),
+            @ApiResponse(responseCode = "404", description = "Attachment not found")
+    })
     @DeleteMapping("/{attachmentId}")
     public ResponseEntity<Void> deleteAttachment(@PathVariable String attachmentId) {
         attachmentService.deleteAttachment(attachmentId);

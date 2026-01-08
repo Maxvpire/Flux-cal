@@ -10,8 +10,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.io.InputStream;
-import java.util.ArrayList;
-import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -58,19 +56,15 @@ public class AttachmentService {
         Attachment attachment = attachmentRepository.findById(attachmentId)
                 .orElseThrow(() -> new NotFoundException("Attachment not found with ID: " + attachmentId));
 
-        // Remove from Event's list to maintain bidirectional consistency
         if (attachment.getEvent() != null) {
             attachment.getEvent().getAttachments().remove(attachment);
         }
 
-        // Extract fileName from fileUrl
         String fileUrl = attachment.getFileUrl();
         String fileName = fileUrl.substring(fileUrl.lastIndexOf("/") + 1);
 
-        // Delete from MinIO
         minioService.deleteFile(fileName);
 
-        // Delete from DB
         attachmentRepository.delete(attachment);
     }
 }

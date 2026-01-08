@@ -4,6 +4,11 @@ import com.flux.calendar_service.calendar.dto.CalendarRequest;
 import com.flux.calendar_service.calendar.dto.CalendarResponse;
 import com.flux.calendar_service.calendar.dto.CalendarUpdateRequest;
 import com.flux.calendar_service.calendar.dto.PrimaryRequest;
+import com.flux.calendar_service.exceptions.EmptyCalendarsException;
+import com.flux.calendar_service.exceptions.MustBeUniqueException;
+import com.flux.calendar_service.exceptions.MustNotBeEmptyException;
+import com.flux.calendar_service.exceptions.SomethingWentWrongException;
+
 import jakarta.ws.rs.NotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.apache.commons.lang.StringUtils;
@@ -26,7 +31,7 @@ public class CalendarService {
         }
         for (Calendar calendar : calendars) {
             if(calendar.getTitle().equals(request.title())){
-                throw new RuntimeException("The title of calendar must be unique!");
+                throw new MustBeUniqueException("The title of calendar must be unique!");
             }
         }
 
@@ -43,7 +48,7 @@ public class CalendarService {
             for (Calendar calendar : calendars) {
                 if(calendar.isPrimary()){
                     Calendar calendar1 = calendarRepository.findCalendarByIdAndIsDeletedFalse(calendar.getId())
-                            .orElseThrow(() -> new RuntimeException("Something went wrong!"));
+                            .orElseThrow(() -> new SomethingWentWrongException("Something went wrong!"));
                     calendar1.setPrimary(false);
                     calendarRepository.save(calendar1);
                     isPrimary = true;
@@ -75,7 +80,7 @@ public class CalendarService {
 
     public CalendarResponse getCalendarById(String id){
         if(id.isBlank()){
-            throw new RuntimeException("Id can not be empty");
+            throw new MustNotBeEmptyException("Id can not be empty");
         }
 
 
@@ -86,7 +91,7 @@ public class CalendarService {
 
     public List<CalendarResponse> getCalendarsByUserId(String userId) {
         if(userId.isBlank()){
-            throw new RuntimeException("user id can not be empty!");
+            throw new MustNotBeEmptyException("user id can not be empty!");
         }
 
         List<CalendarResponse> userCalendars = calendarRepository.findCalendarByUserIdAndIsDeletedFalse(userId)
@@ -120,7 +125,7 @@ public class CalendarService {
 
     public CalendarResponse getByTitle(String userId, String title) {
         if(userId.isBlank() || title.isBlank()){
-            throw new RuntimeException("User's id or calendar's title can not be empty!");
+            throw new MustNotBeEmptyException("User's id or calendar's title can not be empty!");
         }
 
         List<CalendarResponse> calendars = calendarRepository.findCalendarByUserId(userId)
@@ -131,7 +136,7 @@ public class CalendarService {
         CalendarResponse output = null;
 
         if(calendars.isEmpty()) {
-            throw new RuntimeException("Empty!!!");
+            throw new EmptyCalendarsException("Not any calendars is found!");
         }
 
         for(CalendarResponse calendar : calendars) {
