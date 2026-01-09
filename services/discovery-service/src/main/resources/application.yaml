@@ -1,6 +1,6 @@
 spring:
   config:
-    import: optional:configserver:http://localhost:8888
+    import: optional:configserver:https://flux-config-server.fly.dev/
 
   cloud:
     config:
